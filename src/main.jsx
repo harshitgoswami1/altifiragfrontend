@@ -59,6 +59,7 @@ function App() {
     const request = new AbortController()
     controller.current = request
     setAsked(text)
+    setQuestion('')
     setAnswer('')
     setCitations([])
     setError('')
@@ -203,12 +204,15 @@ function App() {
             value={question}
             onChange={event => setQuestion(event.target.value)}
             onKeyDown={event => {
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submit(event)
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                event.currentTarget.form.requestSubmit()
+              }
             }}
             disabled={active}
           />
           <div className="form-actions">
-            <span>⌘ / Ctrl + Enter</span>
+            <span>Enter to send · Shift + Enter for a new line</span>
             <button type="submit" disabled={active || !question.trim()}>Ask question <span aria-hidden="true">↑</span></button>
           </div>
         </form>
