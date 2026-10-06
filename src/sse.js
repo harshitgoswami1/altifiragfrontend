@@ -49,3 +49,17 @@ export async function* readSSE(stream) {
     reader.releaseLock()
   }
 }
+
+export function mergeCitations(current, incoming) {
+  if (!Array.isArray(incoming)) return current
+
+  const merged = [...current]
+  const seen = new Set(current.map(citation => citation?.url).filter(Boolean))
+  for (const citation of incoming) {
+    if (typeof citation?.url === 'string' && !seen.has(citation.url)) {
+      seen.add(citation.url)
+      merged.push(citation)
+    }
+  }
+  return merged
+}

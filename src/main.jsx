@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { readSSE } from './sse.js'
+import { mergeCitations, readSSE } from './sse.js'
 import './style.css'
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const exampleQuestions = [
+  'How many bonds are available to invest in?',
+  'Show bonds issued by HDFC Bank',
+  'Which bonds have the highest yield?',
+]
 
 function sourceUrl(value) {
   try {
@@ -12,13 +17,6 @@ function sourceUrl(value) {
   } catch {
     return null
   }
-}
-
-function observationDate(value) {
-  const date = new Date(value)
-  return value && !Number.isNaN(date.getTime())
-    ? new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
-    : value || 'Date unavailable'
 }
 
 function App() {
@@ -90,7 +88,7 @@ function App() {
           throw new Error('The server sent an invalid response.')
         }
         if (message.event === 'citations') {
-          setCitations(Array.isArray(payload) ? payload : [])
+          setCitations(previous => mergeCitations(previous, payload))
         } else if (message.event === 'token') {
           setAnswer(previous => previous + (typeof payload?.text === 'string' ? payload.text : ''))
         } else if (message.event === 'done') {
@@ -120,16 +118,23 @@ function App() {
   return (
     <div className="site">
       <header className="topbar">
-        <div className="wordmark">altifi<span>.</span></div>
+        <img className="topbar-logo" src="/altifi-logo-dark.png" alt="Altifi by Northern Arc" />
       </header>
 
       <main className="hero">
         <div className="hero-copy">
-          <h1>Bonds and finance,<br />made clearer.</h1>
-          <p>Ask about bonds and fixed deposits. Get answers grounded in the source library.</p>
+          <span className="hero-kicker">Read-only bond intelligence</span>
+          <h1>Invest in Bonds<br />Earn 8-14%* p.a.<br />monthly fixed returns</h1>
+          <p>Search the bond database in plain English. Look up an ISIN, compare issuer records, check yields, or count bonds open for investment.</p>
+          <div className="example-questions" aria-label="Example questions">
+            {exampleQuestions.map(example => <button key={example} type="button" onClick={() => {
+              setQuestion(example)
+              setChatOpen(true)
+            }}>{example}</button>)}
+          </div>
         </div>
       </main>
-      <footer className="site-footer">Information from indexed documents. Check sources before making financial decisions.</footer>
+      <footer className="site-footer">Answers use a read-only bond database. Verify source records before making financial decisions.</footer>
 
       <button
         ref={openButton}
@@ -145,10 +150,7 @@ function App() {
 
       {chatOpen && <aside id="chat-window" className="chat-window" aria-label="Altifi chat">
         <div className="chat-heading">
-          <div>
-            <span className="chat-heading-caption">Altifi research</span>
-            <h2>Ask the library</h2>
-          </div>
+          <img className="chat-logo" src="/altifi-logo.png" alt="Altifi by Northern Arc" />
           <button className="chat-close" type="button" aria-label="Close chat" onClick={closeChat}>×</button>
         </div>
 
@@ -156,19 +158,19 @@ function App() {
           <div className="chat-status" role="status">
             <span className={active ? 'status-dot is-active' : 'status-dot'} aria-hidden="true" />
             {status === 'idle' && 'Ready to answer'}
-            {status === 'waiting' && 'Finding sources…'}
+            {status === 'waiting' && 'Querying bond records…'}
             {status === 'streaming' && 'Writing answer…'}
             {status === 'done' && 'Answer complete'}
             {status === 'cancelled' && 'Response cancelled'}
             {status === 'error' && 'Response stopped'}
           </div>
 
-          {status === 'idle' ? <div className="chat-empty"><p>What would you like to know?</p><span>Ask a question about bonds or fixed deposits to begin.</span></div> : <>
+          {status === 'idle' ? <div className="chat-empty"><div className="bot-intro"><h2>Your bond research assistant</h2><p>Ask about issuers, ISINs, yields, or bonds open for investment.</p></div></div> : <>
             <p className="asked-question">{asked}</p>
             <div className="answer-content" aria-live="polite" aria-atomic="false">
               {answer ? <p className="answer-text">{answer}</p> : <p className="answer-placeholder">
-                {status === 'waiting' && 'Looking through the source library…'}
-                {status === 'streaming' && 'Reading the sources…'}
+                {status === 'waiting' && 'Looking through the bond database…'}
+                {status === 'streaming' && 'Reading the matching records…'}
                 {status === 'done' && 'No answer was returned.'}
                 {status === 'cancelled' && 'Response cancelled.'}
                 {status === 'error' && 'No answer was returned.'}
@@ -177,15 +179,15 @@ function App() {
             {error && <p className="error-message" role="alert">{error}</p>}
             {active && <button className="cancel-button" type="button" onClick={() => controller.current?.abort()}>Cancel response</button>}
             {(citations.length > 0 || status === 'done') && <div className="sources-section">
-              <h3>Sources</h3>
+              <h3>Source records</h3>
               {citations.length ? <ul className="source-list">
                 {citations.map((citation, index) => {
                   const url = sourceUrl(citation.url)
-                  return <li key={citation.chunk_id || index} className="source-item">
+                  return <li key={citation.url || index} className="source-item">
                     <span className="source-number">{String(index + 1).padStart(2, '0')}</span>
                     <div>
                       {url ? <a href={url} target="_blank" rel="noopener noreferrer">{citation.title || url}<span aria-hidden="true"> ↗</span></a> : <span className="source-title">{citation.title || 'Untitled source'}</span>}
-                      <span className="source-date">Observed {observationDate(citation.observed_at)}</span>
+                      {url && <span className="source-meta">Open source record</span>}
                     </div>
                   </li>
                 })}
@@ -195,25 +197,23 @@ function App() {
         </div>
 
         <form className="question-form" onSubmit={submit}>
-          <label htmlFor="question">Your question</label>
-          <textarea
-            ref={questionInput}
-            id="question"
-            rows="2"
-            placeholder="What is a fixed deposit?"
-            value={question}
-            onChange={event => setQuestion(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault()
-                event.currentTarget.form.requestSubmit()
-              }
-            }}
-            disabled={active}
-          />
-          <div className="form-actions">
-            <span>Enter to send · Shift + Enter for a new line</span>
-            <button type="submit" disabled={active || !question.trim()}>Ask question <span aria-hidden="true">↑</span></button>
+          <label className="visually-hidden" htmlFor="question">Your question</label>
+          <div className="composer">
+            <input
+              ref={questionInput}
+              id="question"
+              type="text"
+              placeholder="Ask about a bond…"
+              value={question}
+              onChange={event => setQuestion(event.target.value)}
+              maxLength={4000}
+              disabled={active}
+            />
+            <button className="send-button" type="submit" aria-label="Send question" disabled={active || !question.trim()}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 19V5m-6 6 6-6 6 6" />
+              </svg>
+            </button>
           </div>
         </form>
       </aside>}
