@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -28,8 +28,12 @@ function sourceUrl(value) {
 }
 
 function ChatTurn({ asked, answer, citations, error, status, active, onCancel }) {
+  const [sourcesOpen, setSourcesOpen] = useState(false)
+  const sourcesId = useId()
+
   return <div className="chat-turn">
     <p className="asked-question">{asked}</p>
+    <div className="answer-byline"><span className="answer-avatar" aria-hidden="true">A</span>Altifi</div>
     <div className="answer-content" aria-live={active ? 'polite' : 'off'} aria-atomic="false">
       {answer ? <div className="answer-text"><ReactMarkdown remarkPlugins={markdownPlugins} components={markdownComponents}>{answer}</ReactMarkdown></div> : <p className="answer-placeholder">
         {status === 'waiting' && 'Looking through the bond database…'}
@@ -42,8 +46,12 @@ function ChatTurn({ asked, answer, citations, error, status, active, onCancel })
     {error && <p className="error-message" role="alert">{error}</p>}
     {active && <button className="cancel-button" type="button" onClick={onCancel}>Cancel response</button>}
     {(citations.length > 0 || status === 'done') && <div className="sources-section">
-      <h3>Source records</h3>
-      {citations.length ? <ul className="source-list">
+      <button className="sources-toggle" type="button" aria-expanded={sourcesOpen} aria-controls={sourcesId} onClick={() => setSourcesOpen(open => !open)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm8 0v5h4M9 12h6m-6 4h6" /></svg>
+        <span>Sources</span><span className="sources-count">{citations.length}</span>
+        <svg className="sources-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      <div className="sources-body" id={sourcesId} hidden={!sourcesOpen}>{citations.length ? <ul className="source-list">
         {citations.map((citation, index) => {
           const url = sourceUrl(citation.url)
           return <li key={citation.url || index} className="source-item">
@@ -54,7 +62,7 @@ function ChatTurn({ asked, answer, citations, error, status, active, onCancel })
             </div>
           </li>
         })}
-      </ul> : <p className="sources-empty">No sources to show.</p>}
+      </ul> : <p className="sources-empty">No sources to show.</p>}</div>
     </div>}
   </div>
 }
@@ -73,8 +81,15 @@ function App() {
   const busy = useRef(false)
   const openButton = useRef(null)
   const questionInput = useRef(null)
+  const chatScroll = useRef(null)
 
   useEffect(() => () => controller.current?.abort(), [])
+  useEffect(() => {
+    const scroll = chatScroll.current
+    if (scroll && (status === 'waiting' || scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120)) {
+      scroll.scrollTop = scroll.scrollHeight
+    }
+  }, [asked, answer, status])
   useEffect(() => {
     if (!chatOpen) return
     questionInput.current?.focus()
@@ -195,26 +210,27 @@ function App() {
 
       <button
         ref={openButton}
-        className="chat-trigger"
+        className={chatOpen ? 'chat-trigger is-open' : 'chat-trigger'}
         type="button"
         aria-controls="chat-window"
         aria-expanded={chatOpen}
+        aria-label={chatOpen ? 'Close chat' : 'Open chat'}
+        title={chatOpen ? 'Close chat' : 'Open chat'}
         onClick={() => chatOpen ? closeChat() : setChatOpen(true)}
       >
-        {chatOpen ? 'Close chat' : 'Open chat'}
-        <span className="trigger-icon" aria-hidden="true">{chatOpen ? '×' : '+'}</span>
+        {chatOpen ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 19 19M19 5 5 19" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.6-3.2A7.5 7.5 0 1 1 20 11.5Z" /><path d="M8.5 11.5h7" /></svg>}
       </button>
 
       {chatOpen && <aside id="chat-window" className="chat-window" aria-label="Altifi chat">
         <div className="chat-heading">
           <img className="chat-logo" src="/altifi-logo.png" alt="Altifi by Northern Arc" />
           <div className="chat-heading-actions">
-            <button className="new-chat" type="button" onClick={newChat} disabled={active}>New chat</button>
-            <button className="chat-close" type="button" aria-label="Close chat" onClick={closeChat}>×</button>
+            <button className="new-chat" type="button" aria-label="New chat" title="New chat" onClick={newChat} disabled={active}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+            <button className="chat-close" type="button" aria-label="Close chat" title="Close chat" onClick={closeChat}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 19 19M19 5 5 19" /></svg></button>
           </div>
         </div>
 
-        <div className="chat-scroll">
+        <div className="chat-scroll" ref={chatScroll}>
           <div className="chat-status" role="status">
             <span className={active ? 'status-dot is-active' : 'status-dot'} aria-hidden="true" />
             {status === 'idle' && 'Ready to answer'}
@@ -225,7 +241,15 @@ function App() {
             {status === 'error' && 'Response stopped'}
           </div>
 
-          {status === 'idle' ? <div className="chat-empty"><div className="bot-intro"><h2>Your bond research assistant</h2><p>Ask about issuers, ISINs, yields, or bonds open for investment.</p></div></div> : <>
+          {status === 'idle' ? <div className="chat-empty">
+            <div className="bot-intro"><h2>What would you like to know?</h2><p>Ask about issuers, ISINs, yields, or bonds open for investment.</p></div>
+            <div className="chat-suggestions" aria-label="Suggested questions">
+              {exampleQuestions.map(example => <button key={example} type="button" onClick={() => {
+                setQuestion(example)
+                questionInput.current?.focus()
+              }}><span>{example}</span><span aria-hidden="true">→</span></button>)}
+            </div>
+          </div> : <>
             {history.map((turn, index) => <ChatTurn key={index} {...turn} active={false} />)}
             <ChatTurn asked={asked} answer={answer} citations={citations} error={error} status={status} active={active} onCancel={() => controller.current?.abort()} />
           </>}
