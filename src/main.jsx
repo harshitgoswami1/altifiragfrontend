@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { createConversation } from './conversation.js'
 import { mergeCitations, readSSE } from './sse.js'
 import './style.css'
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+const markdownPlugins = [remarkGfm]
+const markdownComponents = {
+  a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+  table: ({ node, ...props }) => <div className="answer-table-scroll"><table {...props} /></div>,
+}
 const exampleQuestions = [
   'How many bonds are available to invest in?',
   'Show bonds issued by HDFC Bank',
@@ -24,7 +31,7 @@ function ChatTurn({ asked, answer, citations, error, status, active, onCancel })
   return <div className="chat-turn">
     <p className="asked-question">{asked}</p>
     <div className="answer-content" aria-live={active ? 'polite' : 'off'} aria-atomic="false">
-      {answer ? <p className="answer-text">{answer}</p> : <p className="answer-placeholder">
+      {answer ? <div className="answer-text"><ReactMarkdown remarkPlugins={markdownPlugins} components={markdownComponents}>{answer}</ReactMarkdown></div> : <p className="answer-placeholder">
         {status === 'waiting' && 'Looking through the bond database…'}
         {status === 'streaming' && 'Reading the matching records…'}
         {status === 'done' && 'No answer was returned.'}

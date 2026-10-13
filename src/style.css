@@ -51,7 +51,32 @@ h1 { margin: 0; font-size: clamp(52px, 6.8vw, 102px); font-weight: 500; line-hei
 .asked-question { width: fit-content; max-width: 90%; margin: 24px 0 0 auto; padding: 11px 14px; border: 1px solid #cae6e1; border-radius: 14px 14px 4px 14px; background: #ddf1ee; color: #173b38; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .chat-turn + .chat-turn { margin-top: 16px; border-top: 1px solid #dce5e2; }
 .answer-content { padding: 25px 0 10px; }
-.answer-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.7; }
+.answer-text { overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+.answer-text > :first-child { margin-top: 0; }
+.answer-text > :last-child { margin-bottom: 0; }
+.answer-text p, .answer-text ul, .answer-text ol, .answer-text blockquote, .answer-text pre, .answer-text .answer-table-scroll { margin: 0 0 13px; }
+.answer-text h1, .answer-text h2, .answer-text h3, .answer-text h4 { margin: 20px 0 8px; color: #173b38; font-weight: 700; line-height: 1.35; letter-spacing: -.02em; }
+.answer-text h1 { font-size: 18px; }
+.answer-text h2 { font-size: 16px; }
+.answer-text h3, .answer-text h4 { font-size: 14px; }
+.answer-text ul, .answer-text ol { padding-left: 21px; }
+.answer-text li + li { margin-top: 5px; }
+.answer-text li > p { margin-bottom: 5px; }
+.answer-text a { color: #007f7a; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.answer-text a:hover { color: #005e59; }
+.answer-text a:focus-visible { outline: 2px solid #009e98; outline-offset: 3px; }
+.answer-text blockquote { padding: 8px 12px; border-left: 3px solid #009e98; background: #eef6f3; color: #455551; }
+.answer-text blockquote > :last-child { margin-bottom: 0; }
+.answer-text code { padding: 2px 4px; border-radius: 4px; background: #e7efec; font-size: .9em; }
+.answer-text pre { overflow-x: auto; padding: 12px; border-radius: 8px; background: #173b38; color: #f3f7f5; font-size: 12px; line-height: 1.5; }
+.answer-text pre code { padding: 0; background: transparent; font-size: inherit; }
+.answer-text .answer-table-scroll { overflow-x: auto; }
+.answer-text table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: 12px; }
+.answer-text th, .answer-text td { padding: 8px 10px; border-bottom: 1px solid #dce5e2; text-align: left; }
+.answer-text th { background: #eef6f3; color: #173b38; font-weight: 700; }
+.answer-text img { max-width: 100%; height: auto; }
+.answer-text hr { margin: 18px 0; border: 0; border-top: 1px solid #dce5e2; }
+.answer-text input[type="checkbox"] { accent-color: #009e98; }
 .answer-placeholder { margin: 0; color: #777; font-size: 13px; line-height: 1.6; }
 .error-message { margin: 12px 0; padding: 11px 12px; border-radius: 8px; background: #f4e3e1; color: #923e37; font-size: 12px; line-height: 1.5; }
 .cancel-button { margin: 5px 0 15px; padding: 4px 0; border: 0; background: transparent; color: #555; font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
