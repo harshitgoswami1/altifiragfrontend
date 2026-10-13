@@ -10,4 +10,6 @@ The Vite development server proxies `/v1` requests to the backend, so the browse
 
 `VITE_API_BASE_URL` sets the request base path. It defaults to empty, which sends requests to `/v1/chat/stream` on the current origin. For a production deployment, configure your web server to proxy `/v1` to the backend. Cross-origin requests also work when `VITE_API_BASE_URL` is absolute and the frontend's exact origin is listed in the backend's `CORS_ORIGINS`. Use `npm run build` to create `dist/`.
 
-Run the small stream parser check with `npm test`.
+Run the focused chat and stream checks with `npm test`.
+
+The chat keeps its conversation ID in the browser tab's `sessionStorage`, so follow-up questions continue after a refresh. The visible messages are kept only while the page is open, and the backend's in-memory history is lost when the backend restarts. Use **New chat** to start with a fresh ID.

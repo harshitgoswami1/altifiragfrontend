@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { createConversation } from './conversation.js'
 import { mergeCitations, readSSE } from './sse.js'
 import './style.css'
 
@@ -19,6 +20,38 @@ function sourceUrl(value) {
   }
 }
 
+function ChatTurn({ asked, answer, citations, error, status, active, onCancel }) {
+  return <div className="chat-turn">
+    <p className="asked-question">{asked}</p>
+    <div className="answer-content" aria-live={active ? 'polite' : 'off'} aria-atomic="false">
+      {answer ? <p className="answer-text">{answer}</p> : <p className="answer-placeholder">
+        {status === 'waiting' && 'Looking through the bond database…'}
+        {status === 'streaming' && 'Reading the matching records…'}
+        {status === 'done' && 'No answer was returned.'}
+        {status === 'cancelled' && 'Response cancelled.'}
+        {status === 'error' && 'No answer was returned.'}
+      </p>}
+    </div>
+    {error && <p className="error-message" role="alert">{error}</p>}
+    {active && <button className="cancel-button" type="button" onClick={onCancel}>Cancel response</button>}
+    {(citations.length > 0 || status === 'done') && <div className="sources-section">
+      <h3>Source records</h3>
+      {citations.length ? <ul className="source-list">
+        {citations.map((citation, index) => {
+          const url = sourceUrl(citation.url)
+          return <li key={citation.url || index} className="source-item">
+            <span className="source-number">{String(index + 1).padStart(2, '0')}</span>
+            <div>
+              {url ? <a href={url} target="_blank" rel="noopener noreferrer">{citation.title || url}<span aria-hidden="true"> ↗</span></a> : <span className="source-title">{citation.title || 'Untitled source'}</span>}
+              {url && <span className="source-meta">Open source record</span>}
+            </div>
+          </li>
+        })}
+      </ul> : <p className="sources-empty">No sources to show.</p>}
+    </div>}
+  </div>
+}
+
 function App() {
   const [chatOpen, setChatOpen] = useState(false)
   const [question, setQuestion] = useState('')
@@ -27,6 +60,8 @@ function App() {
   const [citations, setCitations] = useState([])
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
+  const [history, setHistory] = useState([])
+  const [conversation] = useState(() => createConversation(sessionStorage))
   const controller = useRef(null)
   const busy = useRef(false)
   const openButton = useRef(null)
@@ -48,6 +83,18 @@ function App() {
     openButton.current?.focus()
   }
 
+  function newChat() {
+    conversation.clear()
+    setHistory([])
+    setAsked('')
+    setQuestion('')
+    setAnswer('')
+    setCitations([])
+    setError('')
+    setStatus('idle')
+    questionInput.current?.focus()
+  }
+
   async function submit(event) {
     event.preventDefault()
     const text = question.trim()
@@ -56,6 +103,7 @@ function App() {
     busy.current = true
     const request = new AbortController()
     controller.current = request
+    if (asked) setHistory(previous => [...previous, { asked, answer, citations, error, status }])
     setAsked(text)
     setQuestion('')
     setAnswer('')
@@ -67,7 +115,7 @@ function App() {
       const response = await fetch(`${apiBase}/v1/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ question: text }),
+        body: JSON.stringify(conversation.request(text)),
         signal: request.signal,
       })
       if (!response.ok) {
@@ -87,7 +135,9 @@ function App() {
         } catch {
           throw new Error('The server sent an invalid response.')
         }
-        if (message.event === 'citations') {
+        if (message.event === 'conversation') {
+          conversation.capture(payload)
+        } else if (message.event === 'citations') {
           setCitations(previous => mergeCitations(previous, payload))
         } else if (message.event === 'token') {
           setAnswer(previous => previous + (typeof payload?.text === 'string' ? payload.text : ''))
@@ -151,7 +201,10 @@ function App() {
       {chatOpen && <aside id="chat-window" className="chat-window" aria-label="Altifi chat">
         <div className="chat-heading">
           <img className="chat-logo" src="/altifi-logo.png" alt="Altifi by Northern Arc" />
-          <button className="chat-close" type="button" aria-label="Close chat" onClick={closeChat}>×</button>
+          <div className="chat-heading-actions">
+            <button className="new-chat" type="button" onClick={newChat} disabled={active}>New chat</button>
+            <button className="chat-close" type="button" aria-label="Close chat" onClick={closeChat}>×</button>
+          </div>
         </div>
 
         <div className="chat-scroll">
@@ -166,33 +219,8 @@ function App() {
           </div>
 
           {status === 'idle' ? <div className="chat-empty"><div className="bot-intro"><h2>Your bond research assistant</h2><p>Ask about issuers, ISINs, yields, or bonds open for investment.</p></div></div> : <>
-            <p className="asked-question">{asked}</p>
-            <div className="answer-content" aria-live="polite" aria-atomic="false">
-              {answer ? <p className="answer-text">{answer}</p> : <p className="answer-placeholder">
-                {status === 'waiting' && 'Looking through the bond database…'}
-                {status === 'streaming' && 'Reading the matching records…'}
-                {status === 'done' && 'No answer was returned.'}
-                {status === 'cancelled' && 'Response cancelled.'}
-                {status === 'error' && 'No answer was returned.'}
-              </p>}
-            </div>
-            {error && <p className="error-message" role="alert">{error}</p>}
-            {active && <button className="cancel-button" type="button" onClick={() => controller.current?.abort()}>Cancel response</button>}
-            {(citations.length > 0 || status === 'done') && <div className="sources-section">
-              <h3>Source records</h3>
-              {citations.length ? <ul className="source-list">
-                {citations.map((citation, index) => {
-                  const url = sourceUrl(citation.url)
-                  return <li key={citation.url || index} className="source-item">
-                    <span className="source-number">{String(index + 1).padStart(2, '0')}</span>
-                    <div>
-                      {url ? <a href={url} target="_blank" rel="noopener noreferrer">{citation.title || url}<span aria-hidden="true"> ↗</span></a> : <span className="source-title">{citation.title || 'Untitled source'}</span>}
-                      {url && <span className="source-meta">Open source record</span>}
-                    </div>
-                  </li>
-                })}
-              </ul> : <p className="sources-empty">No sources to show.</p>}
-            </div>}
+            {history.map((turn, index) => <ChatTurn key={index} {...turn} active={false} />)}
+            <ChatTurn asked={asked} answer={answer} citations={citations} error={error} status={status} active={active} onCancel={() => controller.current?.abort()} />
           </>}
         </div>
 
